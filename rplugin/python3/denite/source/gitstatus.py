@@ -200,7 +200,7 @@ class Kind(File):
         args = ['-v', '-m', message]
 
         if self.vim.call('exists', ':Gcommit'):
-            self.vim.command('Gcommit', ' '.join(args))
+            self.vim.command('Gcommit' + ' '.join(args))
             return
 
         for target in context['targets']:
