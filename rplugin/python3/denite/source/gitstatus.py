@@ -196,9 +196,16 @@ class Kind(File):
 
     def action_commit(self, context):
         root = context['targets'][0]['source__root']
-        args = ['-v']
+        message = util.input(self.vim, context, 'Commit message: ')
+        args = ['-v', '-m', message]
+
+        if self.vim.call('exists', ':Gcommit'):
+            self.vim.command('Gcommit', ' '.join(args))
+            return
+
         for target in context['targets']:
             filepath = target['action__path']
             path = os.path.relpath(filepath, root)
             args.append(path)
+
         self.vim.call('easygit#commit', ' '.join(args))
