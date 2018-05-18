@@ -14,14 +14,15 @@ from ..kind.file import Kind as File
 
 EMPTY_LINE = re.compile(r"^\s*$")
 STATUS_MAP = {
-    ' ': ' ',
-    'M': '~',
-    'A': '+',
-    'D': '-',
-    'R': '→',
-    'C': 'C',
-    'U': 'U',
-    '?': '?'}
+    ' ': (' ', ''),
+    'M': ('~', 'modified'),
+    'A': ('+', 'added'),
+    'D': ('-', 'deleted'),
+    'R': ('→', 'renamed'),
+    'C': ('C', 'copied'),
+    'U': ('U', 'updated'),
+    '?': ('?', 'untracked'),
+}
 
 
 def _find_root(path):
@@ -36,9 +37,12 @@ def _find_root(path):
 
 def _parse_line(line, root):
     path = os.path.join(root, line[3:])
-    index_symbol = STATUS_MAP[line[0]]
-    tree_symbol = STATUS_MAP[line[1]]
-    word = "{0}{1} {2}".format(index_symbol, tree_symbol, line[3:])
+    index_symbol, index_desc = STATUS_MAP[line[0]]
+    tree_symbol, tree_desc = STATUS_MAP[line[1]]
+    if tree_desc == index_desc:
+        tree_desc = ''
+    word = "{0}{1} {2} {3} {4}".format(index_symbol, tree_symbol, index_desc.ljust(12), tree_desc.ljust(12), line[3:],)
+
     return {
         'word': word,
         'action__path': path,
@@ -60,37 +64,22 @@ def run_command(commands, cwd, encoding='utf-8'):
 
 
 class Source(Base):
-
     def __init__(self, vim):
         super().__init__(vim)
-
         self.name = 'gitstatus'
         self.kind = Kind(vim)
 
     def on_init(self, context):
         cwd = os.path.normpath(self.vim.eval('getcwd()'))
-
         context['__root'] = _find_root(cwd)
 
     def highlight(self):
-        self.vim.command('highlight deniteGitStatusAdd guifg=#009900 ctermfg=2')
-        self.vim.command('highlight deniteGitStatusChange guifg=#bbbb00 ctermfg=3')
-        self.vim.command('highlight deniteGitStatusDelete guifg=#ff2222 ctermfg=1')
-        self.vim.command('highlight deniteGitStatusUnknown guifg=#5f5f5f ctermfg=59')
+        self.vim.command('highlight deniteGitStatusTracked guifg=#009900 ctermfg=79')
+        self.vim.command('highlight deniteGitStatusUntracked guifg=#ff2222 ctermfg=79')
 
     def define_syntax(self):
-        self.vim.command(r'syntax match deniteGitStatusHeader /^.*$/ ' +
-                         r'containedin=' + self.syntax_name)
-        self.vim.command(r'syntax match deniteGitStatusSymbol /^\s*\zs\S\+/ ' +
-                         r'contained containedin=deniteGitStatusHeader')
-        self.vim.command(r'syntax match deniteGitStatusAdd /+/ ' +
-                         r'contained containedin=deniteGitStatusSymbol')
-        self.vim.command(r'syntax match deniteGitStatusDelete /-/ ' +
-                         r'contained containedin=deniteGitStatusSymbol')
-        self.vim.command(r'syntax match deniteGitStatusChange /\~/ ' +
-                         r'contained containedin=deniteGitStatusSymbol')
-        self.vim.command(r'syntax match deniteGitStatusUnknown /?/ ' +
-                         r'contained containedin=deniteGitStatusSymbol')
+        self.vim.command(r'syntax match deniteGitStatusTracked /^[*[:space:]][^[:space:]?].*$/') # +
+        self.vim.command(r'syntax match deniteGitStatusUntracked /^[*[:space:]][[:space:]?].*$/') # +
 
     def gather_candidates(self, context):
         root = context['__root']
@@ -158,9 +147,9 @@ class Kind(File):
                         prefix = '--cached '
                 else:
                     prefix = '--cached '
+
             prev_id = self.vim.call('win_getid')
             self.vim.call('easygit#diffPreview', prefix + relpath)
-
             self.vim.call('win_gotoid', prev_id)
             self._previewed_target = target
 
@@ -200,7 +189,7 @@ class Kind(File):
         args = ['-v', '-m', message]
 
         if self.vim.call('exists', ':Gcommit'):
-            self.vim.command('Gcommit', ' '.join(args))
+            self.vim.command('Gcommit ' + ' '.join(args))
             return
 
         for target in context['targets']:
