@@ -135,7 +135,7 @@ class Kind(File):
         target = context['targets'][0]
         root = target['source__root']
 
-        preview_window = self.__get_preview_window()
+        preview_window = self._get_preview_window()
         if (preview_window and self._previewed_target == target):
             self.vim.command('pclose!')
         else:
